@@ -3,6 +3,7 @@
 # Recipe:: default
 #
 # Copyright 2010, GoTime Inc.
+# Copyright 2013, SecondMarket Labs, LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,60 +17,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-include_recipe "java6"
-#include_recipe "runit"
+include_recipe "java"
 
-remote_file "/tmp/zookeeper-#{node[:zookeeper][:version]}.tar.gz" do
-  source "http://mirrors.ibiblio.org/pub/mirrors/apache/hadoop/zookeeper/zookeeper-#{node[:zookeeper][:version]}/zookeeper-#{node[:zookeeper][:version]}.tar.gz"
-  mode "0644"
-  not_if { ::File.exists?("/tmp/zookeeper-#{node[:zookeeper][:version]}.tar.gz") }
-  action :create_if_missing
-end
-
-user "zookeeper" do
-  home "/var/lib/zookeeper"
-  shell "/bin/bash"
-  uid 61001
-end
-
-["/usr/lib/zookeeper-#{node[:zookeeper][:version]}", "/etc/zookeeper"].each do |dir|
-  directory dir do
-    owner "root"
-    group "root"
-    mode 0755
-  end
-end
-
-["/var/log/zookeeper", "/var/lib/zookeeper"].each do |dir|
-  directory dir do
-    owner "zookeeper"
-    mode 0755
-  end
-end
-
-bash "untar zookeeper" do
-  user "root"
-  cwd "/tmp"
-  code %(tar zxf /tmp/zookeeper-#{node[:zookeeper][:version]}.tar.gz)
-  not_if { File.exists? "/tmp/zookeeper-#{node[:zookeeper][:version]}" }
-end
-
-bash "copy zk root" do
-  user "root"
-  cwd "/tmp"
-  code %(cp -r /tmp/zookeeper-#{node[:zookeeper][:version]}/* /usr/lib/zookeeper-#{node[:zookeeper][:version]})
-  not_if { File.exists? "/usr/lib/zookeeper-#{node[:zookeeper][:version]}/lib" }
-end
-
-link "/usr/lib/zookeeper" do
-  to "/usr/lib/zookeeper-#{node[:zookeeper][:version]}"
-end
-
-bash "copy zk conf" do
-  user "root"
-  cwd "/usr/lib/zookeeper"
-  code %(cp -R ./conf/* /etc/zookeeper)
-  not_if { File.exists? "/etc/zookeeper/log4j.properties" }
+package "zookeeper" do
+  action :install
 end
 
 template "/etc/zookeeper/log4j.properties" do
@@ -82,7 +33,8 @@ if node.recipe?("zookeeper")
 else
   zk_servers = []
 end
-zk_servers += search(:node, "recipe:zookeeper AND zookeeper_cluster_name:#{node[:zookeeper][:cluster_name]} NOT name:#{node.name}") # don't include this one, since it's already in the list
+
+zk_servers += search(:node, "role:zookeeper AND chef_environment:#{node.chef_environment} AND zookeeper_cluster_name:#{node['zookeeper']['cluster_name']} NOT name:#{node.name}") # don't include this one, since it's already in the list
 
 zk_servers.sort! { |a, b| a.name <=> b.name }
 
@@ -92,7 +44,13 @@ template "/etc/zookeeper/zoo.cfg" do
   variables(:servers => zk_servers)
 end
 
-directory node[:zookeeper][:data_dir] do
+service "zookeeper" do
+  supports :status => true, :restart => true, :reload => true
+  action :enable
+  subscribes :restart, resources(:template => "/etc/zookeeper/zoo.cfg")
+end
+
+directory node['zookeeper']['data_dir'] do
   recursive true
   owner "zookeeper"
   mode 0755
@@ -100,20 +58,12 @@ end
 
 myid = zk_servers.collect { |n| n[:ipaddress] }.index(node[:ipaddress])
 
-template "#{node[:zookeeper][:data_dir]}/myid" do
+template "#{node['zookeeper']['data_dir']}/myid" do
   source "myid.erb"
   owner "zookeeper"
   variables(:myid => myid)
 end
 
-template "/var/lib/zookeeper/zoo-start.sh" do
-  source "zoo-start.sh.erb"
-  mode 0755
-  owner "zookeeper"
+service "zookeeper" do
+  action :start
 end
-
-#runit_service "zookeeper"
-
-#service "zookeeper" do
-  #subscribes :restart, resources(:template => "/etc/zookeeper/zoo.cfg")
-#end

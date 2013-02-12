@@ -1,12 +1,14 @@
-set_unless[:zookeeper][:cluster_name] = "default"
+default['zookeeper']['cluster_name'] = "default"
 
 # ZK defaults
-set_unless[:zookeeper][:tick_time] = 2000
-set_unless[:zookeeper][:init_limit] = 10
-set_unless[:zookeeper][:sync_limit] = 5
-set_unless[:zookeeper][:client_port] = 2181
-set_unless[:zookeeper][:peer_port] = 2888
-set_unless[:zookeeper][:leader_port] = 3888
+default['zookeeper']['tick_time']   = 2000
+default['zookeeper']['init_limit']  = 10
+default['zookeeper']['sync_limit']  = 5
+default['zookeeper']['client_port'] = 2181
+default['zookeeper']['peer_port']   = 2888
+default['zookeeper']['leader_port'] = 3888
 
-set_unless[:zookeeper][:data_dir] = "/var/lib/zookeeper/data"
-set_unless[:zookeeper][:version] = "3.3.0"
+default['zookeeper']['data_dir']   = "/var/lib/zookeeper/data"
+default['zookeeper']['log_dir']   = "/var/log/zookeeper"
+default['zookeeper']['version']    = "3.4.5"
+default['zookeeper']['source_url'] = "http://mirrors.ibiblio.org/apache/zookeeper/zookeeper-#{node['zookeeper']['version']}"
